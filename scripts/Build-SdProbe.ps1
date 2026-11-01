@@ -116,37 +116,37 @@ if ($Mode -eq 'Adb') {
     Write-Utf8Lf (Join-Path $adbState 'adbkey.pub') $normalizedPublicKey
 }
 $instructions = @'
-TEST DIAGNOSTICO FRAMEO 159K - compatibilita non ancora verificata
+FRAMEO 159K DIAGNOSTIC TEST - device compatibility not yet verified
 
-Copia questi file nella cartella principale della microSD, mantenendo esattamente i nomi.
-Non incollare il nome del file APK in un terminale: contiene sintassi shell.
-Apri Impostazioni sulla cornice e inserisci la scheda. Attendi 20-30 secondi.
-Il task di aggiornamento potrebbe mostrare un errore: serve comunque controllare il log.
-Rileggi la scheda sul PC e cerca frameo-159k-probe.txt nella cartella principale.
-Il test legge informazioni Android e scrive soltanto il log e il marker sulla scheda.
-Non esegue su, non abilita ADB, non modifica impostazioni e non scrive firmware.
-Rimuovi i file del pacchetto dalla scheda dopo il test.
+Copy these files directly to the microSD root, preserving every filename exactly.
+Never paste the APK filename into a terminal: it contains shell syntax.
+Open Settings on the frame and insert the card. Wait 20-30 seconds.
+Inspect the script log regardless of the update task's success or error message.
+Read the card on the PC and find frameo-159k-probe.txt at the card root.
+The test reads Android information and writes only its log and marker to the card.
+It does not invoke su, enable ADB, change settings, or write firmware.
+Remove the package files from the card after the test.
 '@
-Write-Utf8Lf (Join-Path $card 'LEGGIMI.txt') ($instructions + "`n")
+Write-Utf8Lf (Join-Path $card 'README.txt') ($instructions + "`n")
 if ($Mode -eq 'Adb') {
     $adbInstructions = @'
-ACCESSO ADB WI-FI AUTENTICATO, PRIMA CONNESSIONE TEMPORANEA
+AUTHENTICATED WI-FI ADB - FIRST, TEMPORARY CONNECTION
 
-Solo per la precisa unita 159K verificata dal log diagnostico.
-Il codice controlla modello, piattaforma, API, build e fingerprint prima delle modifiche.
-Aggiunge la sola chiave pubblica del PC, preserva le chiavi precedenti e abilita TCP 5555.
-Mantiene ro.adb.secure=1; non configura la porta persistente al riavvio.
-Salva baseline e risultato nella cartella frameo-159k-adb sulla scheda.
-In caso di errore tenta il ripristino e ne registra l'esito.
+Only for the exact 159K firmware verified by the diagnostic log.
+The code checks model, platform, API, build and fingerprint before changing settings.
+It adds only the PC public key, preserves previous keys, and enables TCP 5555.
+It retains ro.adb.secure=1; reboot persistence is a separate step.
+It saves the baseline and result in frameo-159k-adb on the card.
+On failure it attempts rollback and records whether rollback was verified.
 
-Apri Impostazioni sulla cornice, inserisci scheda, attendi 30 secondi.
-Chiudi il task con Complete task. Lascia la cornice accesa sulla stessa rete.
-Il PC deve ancora verificare adb connect e una shell autenticata.
-Un messaggio APK successfully installed da solo non prova che ADB funzioni.
-Il nome insolito dell'APK contiene sintassi shell: non incollarlo in un terminale.
-I file di chiave privata non sono inclusi nel pacchetto.
+Open Settings on the frame, insert the card, and wait 30 seconds.
+Close the task with Complete task. Leave the frame powered on and on the same LAN.
+The PC must still verify adb connect and an authenticated shell.
+APK successfully installed alone does not prove that ADB works.
+The unusual APK filename contains shell syntax: never paste it into a terminal.
+Private key files are not included in this package.
 '@
-    Write-Utf8Lf (Join-Path $card 'LEGGIMI.txt') ($adbInstructions + "`n")
+    Write-Utf8Lf (Join-Path $card 'README.txt') ($adbInstructions + "`n")
 }
 
 $inventory = @()
@@ -181,6 +181,6 @@ $metadata = [ordered]@{
 }
 Write-Utf8Lf (Join-Path $out 'manifest.json') (($metadata | ConvertTo-Json -Depth 6) + "`n")
 Write-Utf8Lf (Join-Path $out 'apk-verification.txt') ($signature + "`n" + $badging + "`n")
-Write-Output "Pacchetto verificato: $archivePath"
-Write-Output "File scheda: $card"
-Write-Output 'Verifica sul dispositivo ancora necessaria.'
+Write-Output "Verified package: $archivePath"
+Write-Output "SD card files: $card"
+Write-Output 'Device verification is still required.'

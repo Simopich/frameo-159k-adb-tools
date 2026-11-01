@@ -1,46 +1,128 @@
-# Diagnostica ADB per Frameo 159K
+# Frameo 159K: authenticated, persistent Wi-Fi ADB
 
-Pacchetto microSD per verificare il percorso delle utility di manutenzione Frameo quando USB ADB, ADB Wi-Fi e la barra notifiche non sono accessibili.
+Windows PowerShell tools and a report for one owner-controlled Frameo 159K. The SD manufacturer-utility route provided initial root command execution; the firmware's existing network-ADB hook then provided persistence. **Authenticated Wi-Fi ADB was verified after a complete shutdown, a power-adapter change, and a new boot on November 1, 2026.**
 
-La prima prova sulla cornice ha confermato esecuzione come UID 0, modello 159K, Rockchip RK3326, Android 8.1/API 27 e Frameo `v1.32.16_-_OTA_test (80321)`. La build Android è `RK3326_8.1_AY_FRAMEO_202511241509`; il fingerprint è `rockchip/rk3326_evb/rk3326_evb:8.1.0/OC/150829:user/release-keys`.
+ADB was already included in the firmware. This project enables access to it. It does not install a replacement daemon or flash a rooted image.
 
-Il log rileva `ro.adb.secure=1`, adbd già avviato, porte TCP temporanea e persistente vuote e SELinux Permissive. Questi risultati descrivono questa unità; non dimostrano compatibilità di altre cornici.
+## Credits and original research
 
-## Cosa esegue il test
+- **[dusty-du/frameo-159k-jailbreak-builder](https://github.com/dusty-du/frameo-159k-jailbreak-builder): the key source for the SD auto-run and APK-filename command-injection mechanism.** Its report covers Frameo 1.30.19 on a 159K. This project adapts the mechanism and checks the unit below; it does not claim discovery of the vulnerability.
+- [wesbos/photo-frame-dashboard issue #126](https://github.com/wesbos/photo-frame-dashboard/issues/126): 159K USB/network ADB failures, attempted sideloading and keyboard shortcuts, and discussion of Rockchip's `persist.internet.adb.enable` hook.
+- [hbmartin's Dromart MI86 report, PR #262](https://github.com/wesbos/photo-frame-dashboard/pull/262): a reference for the SD diagnostic approach, authenticated access and recovery. It concerns different hardware and Android firmware. Its device-specific ADB enabler was not run on this frame.
 
-Il file di configurazione avvia il task di aggiornamento Frameo. Un APK locale privo di codice, con package `net.frameo.frame` e versionCode `80322`, permette di verificare un percorso di command injection documentato da altri proprietari. Il nome dell'APK contiene sintassi shell: deve essere copiato come file, mai incollato in un terminale.
+The implementation here was prepared with Codex assistance. Device properties, root access and the cold-boot result were checked on the actual frame rather than inferred from other reports.
 
-Lo script eseguito legge identità del processo, modello, firmware, stato di adbd, posizione di `su` e modalità SELinux. Scrive esclusivamente `frameo-159k-probe.txt` e `frameo-159k-probe.done` sulla scheda. Non esegue `su`, non cambia impostazioni Android e non legge foto, password o chiavi. L'APK di prova ha una firma locale diversa da Frameo: un eventuale tentativo di aggiornamento viene rifiutato dalla verifica della firma Android. Un messaggio di aggiornamento fallito, da solo, non dimostra che lo script sia stato eseguito: serve il log.
+## Verified device
 
-Non è un installer di Termux. Prima si verifica il log, poi si valuta come ottenere accesso ADB autenticato sulla precisa unità.
+| Item | Observed value |
+| --- | --- |
+| Model / device | `159K` / `159K` |
+| Firmware-reported brand | `Digital Picture Frame` |
+| Firmware-reported manufacturer | `rockchip` (a property value, not an independently identified retail manufacturer) |
+| Platform / board / hardware | `rk3326` / `rk30sdk` / `rk30board` |
+| ADB product | `rk3326_evb` |
+| Primary ABI | `arm64-v8a` |
+| ABI list | `arm64-v8a,armeabi-v7a,armeabi` |
+| Android | `8.1.0`, API `27` |
+| Reported security patch | `2020-11-05` |
+| Frameo application | `v1.32.16_-_OTA_test`, versionCode `80321` |
+| Android firmware build | `RK3326_8.1_AY_FRAMEO_202511241509` |
+| Build fingerprint | `rockchip/rk3326_evb/rk3326_evb:8.1.0/OC/150829:user/release-keys` |
+| Kernel | `4.4.138` |
+| Display / density | `1920x1080` / `160 dpi` |
+| Reported memory | `MemTotal: 976860 kB` |
+| `/data` filesystem size | `58,169,312` 1K blocks; not a measurement of total raw eMMC capacity |
+| SELinux | `Permissive` |
+| Existing `su` | `/system/xbin/su`; `su -c id` returned UID `0` |
+| Normal ADB shell | UID `2000`, context `u:r:shell:s0` |
+| ADB authentication | `ro.adb.secure=1`, retained throughout |
+| Working SD storage | FAT32 microSD volume of approximately 4 GB |
 
-## Primo accesso ADB autenticato
+The Frameo app version and Android firmware build are separate identifiers. Matching `159K` or `80321` alone does not establish compatibility. The retail brand, screen diagonal, raw flash layout and total eMMC capacity have not been independently established here. No serials, MAC addresses, LAN addresses or real host keys are published.
 
-Il builder accetta anche la modalità `Adb`:
+## What did not work
+
+- USB-C to USB-C from the Windows PC did not enumerate an Android/ADB device with Frameo Beta Program and ADB Access enabled. Toggling access did not help. This does not prove the port is physically power-only.
+- The frame answered on the LAN, but TCP 5555 initially refused connections. No ADB service was discovered via mDNS.
+- Placing the Termux APK at the SD root and inserting the card while Frameo Settings was open did not open an installer.
+- Swiping down and Win+N on a keyboard connected to the frame did not expose the notification bar.
+- An initial 128 GB card was not recognized; a FAT32 microSD volume of approximately 4 GB worked. The first card's filesystem and the working card's total raw capacity were not measured, so this is not proof of a universal 128 GB limit.
+
+## Scope
+
+Use only on a device you own and on a trusted LAN. The SD mechanism runs commands with the manufacturer's utility privileges. Keep authentication enabled; do not expose TCP 5555 to the Internet. Ordinary TCP ADB should not be treated as encrypted transport.
+
+The successful path used no boot, loader, recovery, system-image or raw-partition writes. Frameo and vendor packages were not disabled or removed. This is a one-unit result, not a universal unlock. Do not bypass firmware checks just because another frame has the same model name.
+
+## 1. Build and run the diagnostic SD package
+
+Requirements: PowerShell 7, JDK 17, official Android SDK build-tools for Windows, a platform `android.jar`, and a microSD card the frame can read. Tested host tooling: platform-tools 37.0.0, build-tools 36.0.0 and the Android 27 platform. Get tooling from [Android's SDK documentation](https://developer.android.com/tools) and [platform-tools downloads](https://developer.android.com/tools/releases/platform-tools).
+
+The defaults refer to this workspace's ignored SDK downloads. Other users can supply normal SDK paths. Run from the repository root, adjusting these paths:
 
 ```powershell
-./scripts/Build-SdProbe.ps1 -Mode Adb `
-  -AdbPublicKey "$env:USERPROFILE/.android/adbkey.pub" `
+$buildTools = "$env:LOCALAPPDATA/Android/Sdk/build-tools/36.0.0"
+$androidJar = "$env:LOCALAPPDATA/Android/Sdk/platforms/android-27/android.jar"
+./scripts/Build-SdProbe.ps1 `
+  -BuildTools $buildTools -AndroidJar $androidJar `
+  -Mode Probe -Output ./outputs/frameo-159k-sd-probe
+```
+
+Choose a new output path if one exists; the builder preserves earlier outputs. It builds a locally signed APK without DEX code, verifies identity and signature, creates a ZIP, and checks extracted-file SHA256 hashes. Signing material and intermediates stay under ignored `work/`, outside the package.
+
+Extract the ZIP directly into the card root, preserving all names:
+
+```text
+SD root/
+  Frameo_utilities/
+    frameo_utilities.config
+    [exactly one specially named diagnostic APK]
+  p_frameo_jb
+  README.txt
+```
+
+The config is `auto_run=action_update_version`. The default APK is package `net.frameo.frame`, versionCode `80322`, above the tested Frameo versionCode `80321`. Its filename is part of the command-injection mechanism: **never paste that filename into a terminal**. Keep exactly one APK inside `Frameo_utilities`. An unrelated Termux APK at the card root is outside that folder.
+
+With Frameo running, open Settings and insert the card. Wait 20–30 seconds. A maintenance task may display an installation result and **Complete task**. Ours said **APK successfully installed**. That message alone does not prove that Termux, the dummy package or ADB was installed successfully. Read the script log.
+
+On the PC, look for `frameo-159k-probe.txt` and `frameo-159k-probe.done` at the card root. The probe reads identity, selected properties, the existing `su` location and SELinux. It writes only its log and marker to the card; it does not execute `su` or change Android settings. Our log reported UID 0. No log means root execution has not been demonstrated.
+
+The dummy APK uses a local signer different from installed Frameo. Android's normal signature check should reject its attempted replacement. The injected command runs before the installation result; the log is the evidence. Remove the trigger/package after the test and keep the log privately. Preserve the old log before deliberately clearing its marker for another test.
+
+## 2. Establish the first authenticated ADB connection
+
+Inspect the probe first. The ADB enabler requires UID 0, the exact model, platform, API, build and fingerprint above, and `ro.adb.secure=1`.
+
+Use the **public** `adbkey.pub` belonging to the ADB instance you will connect from. Its usual Windows location is below. Never copy the private `adbkey` onto the card or into Git. If the public key is absent, initialize your own ADB setup before proceeding; do not borrow another person's key pair.
+
+```powershell
+./scripts/Build-SdProbe.ps1 `
+  -BuildTools $buildTools -AndroidJar $androidJar `
+  -Mode Adb -AdbPublicKey "$env:USERPROFILE/.android/adbkey.pub" `
   -Output ./outputs/frameo-159k-sd-adb
 ```
 
-La chiave pubblica viene verificata sul PC e inserita con un commento neutro. La chiave privata non viene letta dal builder e non viene copiata sulla scheda. Il file `scripts/sd-enable-adb.sh` richiede UID 0 e verifica modello, piattaforma, API, build Android, fingerprint e autenticazione ADB prima di cambiare lo stato del dispositivo.
+The builder validates the public key and uses a neutral comment. Before replacing a previous SD package, check its manifest and keep a local copy. Preserve diagnostic logs and other files; do not overwrite another maintenance package or an earlier attempt's baseline. Copy the new trigger config last, after the other files.
 
-L'enabler salva sulla scheda il contenuto e i metadati delle precedenti autorizzazioni ADB, le porte originali e lo stato di adbd. Preserva le chiavi esistenti, aggiunge la chiave pubblica di questo PC, controlla i permessi, imposta soltanto `service.adb.tcp.port=5555` e riavvia adbd. Verifica il listener e mantiene `ro.adb.secure=1`; `persist.adb.tcp.port` resta al valore originale. Questa prima configurazione non garantisce accesso dopo un riavvio della cornice.
+Insert the card while Settings is open. `scripts/sd-enable-adb.sh` saves existing authorization bytes and metadata, original TCP properties and adbd state in `frameo-159k-adb/` on the card. It preserves existing keys, adds your public key, sets key permissions, enables temporary TCP 5555, restarts adbd and checks the listener and authentication. It leaves the persistent TCP property unchanged at this stage.
 
-In caso di errore, tenta di ripristinare chiavi, metadati, porta temporanea e stato del daemon. Il risultato del ripristino è registrato senza dichiarare successo quando una verifica fallisce. Le copie di stato nella cartella `frameo-159k-adb` vanno conservate localmente fino alla verifica della connessione. Il marker `started` impedisce tentativi ripetuti dopo un'interruzione; non va eliminato per aggirare un errore senza prima controllare il log e lo stato del dispositivo.
+On error it attempts rollback and records whether rollback was verified. Keep the state directory until the PC has confirmed access. The `started` marker blocks blind retries after interruption: inspect the result and baseline before doing anything with that marker. Successful execution retires the auto-run config so reinsertion does not automatically rerun the task.
 
-L'archivio contiene una nuova struttura di scheda: trasferire i file con il trigger `Frameo_utilities/frameo_utilities.config` per ultimo. Non sovrascrivere pacchetti di manutenzione altrui o baseline di tentativi precedenti. Il trasferimento fatto per questa unità controlla prima gli hash del precedente pacchetto diagnostico e ne conserva una copia locale. Dopo la prova, il PC deve verificare `adb connect` e l'esecuzione di una shell autenticata. Il messaggio dell'utility `APK successfully installed` non costituisce questa verifica.
+Replace `FRAME_IP` with the frame's current IP:
 
-Il primo accesso è stato verificato su hardware il 1 novembre 2026: il PC ha ottenuto stato ADB `device`, eseguito una shell con UID 2000 e verificato UID 0 tramite `su -c id`. Il dispositivo ha confermato `ro.adb.secure=1`, `service.adb.tcp.port=5555` e porta persistente ancora vuota. Il log dell'enabler conferma i controlli locali; la baseline completa del setup è conservata soltanto localmente, sotto `work/device-diagnostics/adb-baseline/`.
+```powershell
+adb connect FRAME_IP:5555
+adb devices -l
+adb -s FRAME_IP:5555 shell id
+adb -s FRAME_IP:5555 shell su -c id
+adb -s FRAME_IP:5555 shell getprop ro.adb.secure
+```
 
-Termux ufficiale GitHub 0.118.3 è stato installato via ADB dopo verifica SHA256 dell'APK universale, aperto con `com.termux/.app.TermuxActivity` e verificato con bootstrap inizializzato (`files/usr/bin/bash` eseguibile). Frameo e i pacchetti di sistema non sono stati disabilitati o rimossi in questa fase.
+Our result was an authorized `device`, UID 2000 shell, UID 0 from `su`, and `ro.adb.secure=1`. Save only the precise SD state directory locally for recovery. Do not publish real authorization files or logs. This first connection alone does not prove reboot persistence.
 
-La connessione reale e l'accesso root sono quindi verificati. La prima fase era temporanea; il successivo passaggio di persistenza nativa è descritto sotto.
+## 3. Enable persistence with the stock firmware hook
 
-## Persistenza nativa, senza dipendenza da Termux
-
-Sulla precisa unità esaminata, `/init.rk30board.rc` contiene già questo trigger del produttore:
+The native property was discussed in issue #126. We verified this existing rule directly in this frame's `/init.rk30board.rc`:
 
 ```text
 on property:persist.internet.adb.enable=1
@@ -48,58 +130,66 @@ on property:persist.internet.adb.enable=1
     restart adbd
 ```
 
-È stato eseguito come root `scripts/enable-native-adb-persistence.sh`, dopo aver salvato la baseline originale in `work/device-diagnostics/native-persistence-before.json`. Lo script verifica identità del firmware, UID 0, autenticazione e presenza del trigger; imposta `persist.adb.tcp.port=5555` e `persist.internet.adb.enable=1`. Non modifica i file init o le immagini firmware, non aggiunge script di avvio e non invia comandi di reboot.
+Before changing anything, record the original persistent and temporary port properties, native enable flag, authentication, current boot ID and authorized-key checksum. Keep the key backup from step 2. Both persistent properties were initially empty on our unit; temporary ADB already used 5555.
 
-Readback e riconnessione iniziali hanno confermato entrambe le proprietà persistenti, porta corrente 5555, `ro.adb.secure=1`, chiavi autorizzate invariate e accesso root.
-
-**Persistenza verificata dopo uno spegnimento completo il 1 novembre 2026.** Il proprietario ha cambiato l'alimentatore e riacceso la cornice. Il PC ha verificato un boot ID diverso dalla baseline, `sys.boot_completed=1`, connessione ADB autenticata disponibile, entrambe le proprietà persistenti ancora impostate, porta corrente 5555, chiavi invariate, shell UID 2000 e `su -c id` con UID 0. Nessuno script Termux è stato usato per ripristinare la connessione. L'evidenza tecnica di questo test resta locale in `work/device-diagnostics/native-persistence-after-power-cycle.json`.
-
-Termux era stato installato come possibile terminale locale, ma non partecipa a questo meccanismo di persistenza. È stato successivamente disinstallato su richiesta del proprietario: il package `com.termux` risulta assente e ADB autenticato, proprietà persistenti e accesso root restano verificati. Non sono stati installati Termux:Boot o servizi analoghi.
-
-Per annullare soltanto questo passaggio sulla stessa unità, la baseline originale rilevava entrambe le proprietà persistenti vuote e la porta temporanea già a 5555. Con accesso root ancora disponibile, il ripristino di tali valori può essere effettuato con:
+With a working authenticated, root-capable connection and the baseline saved:
 
 ```powershell
-# $adb indica adb.exe; $target indica indirizzo e porta della cornice.
-$restore = 'setprop persist.internet.adb.enable ""; setprop persist.adb.tcp.port ""; setprop service.adb.tcp.port 5555; stop adbd; start adbd'
-& $adb -s $target shell "su -c '$restore'"
+adb -s FRAME_IP:5555 push ./scripts/enable-native-adb-persistence.sh /data/local/tmp/frameo-enable-native-adb.sh
+adb -s FRAME_IP:5555 shell "su -c 'chmod 700 /data/local/tmp/frameo-enable-native-adb.sh && sh /data/local/tmp/frameo-enable-native-adb.sh'"
 ```
 
-Usare i valori della baseline del proprio dispositivo; questi comandi descrivono solo quella registrata su questa unità. Il ripristino delle proprietà non modifica le chiavi autorizzate. Verificare sempre riconnessione e readback dopo qualsiasi intervento.
+The guarded script checks the exact firmware, UID 0, authentication and vendor hook, then sets:
 
-## Verifiche del codice ADB
+```text
+persist.adb.tcp.port=5555
+persist.internet.adb.enable=1
+```
+
+The second property invokes the existing init trigger and may briefly disconnect ADB. Reconnect and read back both values, the current port and authentication. Verify that authorized-key bytes are unchanged. No init files or firmware images are edited, no startup service is added, and the script never reboots the frame.
+
+## 4. Verify a complete power cycle
+
+Record `adb -s FRAME_IP:5555 shell cat /proc/sys/kernel/random/boot_id` before shutdown. Shut down through the frame's menu, disconnect power, then power it on again. Reconnect and check:
+
+```powershell
+adb connect FRAME_IP:5555
+adb -s FRAME_IP:5555 shell cat /proc/sys/kernel/random/boot_id
+adb -s FRAME_IP:5555 shell getprop sys.boot_completed
+adb -s FRAME_IP:5555 shell getprop persist.internet.adb.enable
+adb -s FRAME_IP:5555 shell getprop persist.adb.tcp.port
+adb -s FRAME_IP:5555 shell getprop service.adb.tcp.port
+adb -s FRAME_IP:5555 shell getprop ro.adb.secure
+adb -s FRAME_IP:5555 shell id
+adb -s FRAME_IP:5555 shell su -c id
+```
+
+Our November 1 test used a complete shutdown and a different power adapter. The boot ID changed; boot completion was `1`; both ports were `5555`; the native flag was `1`; authentication stayed `1`; keys were unchanged; shell and root access worked. This establishes **one successful cold-boot test on this exact unit**, not every 159K or future firmware version.
+
+The SD auto-run trigger had been retired. No Termux startup script, Termux:Boot, boot-image change or manual post-boot repair was used. Termux was briefly installed after the first ADB connection as a possible local terminal, then uninstalled. Authenticated ADB and root remained available after its removal.
+
+## Rollback and recovery
+
+Keep original probe logs, per-attempt SD snapshots and the native-persistence baseline privately. Investigate a failed rollback before another write.
+
+For **our recorded baseline only**, the following clears both persistent values and restores the previous temporary port of 5555. It does not remove host keys. It is documented but has not been hardware-tested as a full restoration procedure:
+
+```powershell
+$target = 'FRAME_IP:5555'
+$restore = 'setprop persist.internet.adb.enable ""; setprop persist.adb.tcp.port ""; setprop service.adb.tcp.port 5555; stop adbd; start adbd'
+adb -s $target shell "su -c '$restore'"
+```
+
+Use your own baseline instead of assuming the original values were empty. Reconnect and verify every restored property. Restoring or removing an authorization file is a separate operation that must follow its actual saved baseline; no generic destructive key-reset command is provided.
+
+## Tests and artifacts
 
 ```sh
 bash tests/test-adb-enabler.sh
 ```
 
-I test eseguono la logica shell su copie isolate sotto `work/`. Solo nelle copie di test i percorsi Android vengono sostituiti con percorsi di lavoro; proprietà, daemon, listener e metadati Unix sono simulati. Vengono verificati conservazione delle chiavi, baseline assente o vuota, mancata corrispondenza del firmware, esecuzione singola e ripristino dopo errori di listener, proprietà o permessi, anche con adbd inizialmente spento. Non sono prove hardware né verifiche del driver USB o della rete reale.
+Ten host scenarios passed: preserving keys, one-shot success, empty keys, absent directory, rejecting another firmware, and rollback after listener, property or permission errors, including initially stopped adbd. Tests execute the production logic with isolated `work/` paths and mocked Android commands and Unix metadata. Hardware failure injection and full rollback remain untested.
 
-## Costruzione
+Package builds check APK identity, API level, v1 signature, absence of DEX and ZIP extraction hashes. These checks are distinct from the hardware probe, authenticated connection, cold-boot test and post-Termux-removal checks that succeeded on the actual frame.
 
-Occorrono PowerShell 7, JDK 17, build-tools Android ufficiali per Windows e un `android.jar` ufficiale. Gli strumenti scaricati vengono conservati in `work/` e non sono versionati.
-
-```powershell
-./scripts/Build-SdProbe.ps1 `
-  -BuildTools ./work/android-tools/build-tools_r36_windows/android-16 `
-  -AndroidJar ./work/android-tools/platform-27_r03/android-8.1.0/android.jar
-```
-
-Il builder crea un APK senza DEX, verifica firma e identità, prepara la struttura della scheda e produce un archivio ZIP con un manifest SHA256. I file di firma restano in `work/` e non sono inclusi nel pacchetto.
-
-## Prova sulla cornice
-
-1. Estrai il contenuto dell'archivio nella cartella principale di una microSD già riconosciuta dalla cornice. La cartella `Frameo_utilities` e il file `p_frameo_jb` devono essere direttamente nella cartella principale, senza una cartella aggiuntiva intermedia. Conserva esattamente tutti i nomi.
-2. Con Frameo avviato, apri Impostazioni e inserisci la scheda. Il test può avviarsi automaticamente.
-3. Attendi 20–30 secondi. Se compare un task, annota il messaggio e chiudilo quando terminato.
-4. Rimuovi la scheda in sicurezza e leggila sul PC. Il risultato utile è `frameo-159k-probe.txt`.
-5. Rimuovi i file del pacchetto dalla scheda dopo la prova per evitare nuovi avvii del task. Per ripetere deliberatamente il test, conserva il vecchio log e rimuovi il suo marker `.done`.
-
-Se non compare il log, il test non ha dimostrato compatibilità. Non modificare immagini boot, loader o firmware sulla base di queste istruzioni.
-
-## Fonti e limiti
-
-- [Segnalazioni 159K, incluso Frameo 80321](https://github.com/wesbos/photo-frame-dashboard/issues/126).
-- [Descrizione del percorso SD sul 159K con Frameo 1.30.19](https://github.com/dusty-du/frameo-159k-jailbreak-builder).
-- [Test diagnostico dello stesso meccanismo su un Dromart MI86 con Frameo 80321](https://github.com/wesbos/photo-frame-dashboard/pull/262). Il firmware Android e l'hardware di quel dispositivo sono diversi: il suo enabler ADB non viene utilizzato.
-
-La riuscita su questa unità non garantisce la riuscita su altre cornici. Test diagnostico, connessione ADB e persistenza nativa dopo uno spegnimento completo sono verificati su questa unità. Le simulazioni sul PC restano distinte dalle prove hardware. Il debloating non è ancora stato eseguito.
+`work/`, `outputs/`, downloaded SDKs, generated packages, signing keys, real ADB keys and device logs are ignored by Git. The repository contains source and documentation, not a binary pre-authorized for someone else's device. No debloating has been performed as part of this report.
