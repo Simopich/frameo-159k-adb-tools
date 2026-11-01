@@ -50,7 +50,9 @@ on property:persist.internet.adb.enable=1
 
 È stato eseguito come root `scripts/enable-native-adb-persistence.sh`, dopo aver salvato la baseline originale in `work/device-diagnostics/native-persistence-before.json`. Lo script verifica identità del firmware, UID 0, autenticazione e presenza del trigger; imposta `persist.adb.tcp.port=5555` e `persist.internet.adb.enable=1`. Non modifica i file init o le immagini firmware, non aggiunge script di avvio e non invia comandi di reboot.
 
-Readback e riconnessione hanno confermato entrambe le proprietà persistenti, porta corrente 5555, `ro.adb.secure=1`, chiavi autorizzate invariate e accesso root. Il boot ID è ancora quello precedente all'intervento. **La prova dopo un riavvio o spegnimento completo è pendente:** sarà eseguita dopo che il proprietario avrà cambiato l'alimentatore. La configurazione non viene dichiarata verificata attraverso i riavvii prima di quella prova.
+Readback e riconnessione iniziali hanno confermato entrambe le proprietà persistenti, porta corrente 5555, `ro.adb.secure=1`, chiavi autorizzate invariate e accesso root.
+
+**Persistenza verificata dopo uno spegnimento completo il 1 novembre 2026.** Il proprietario ha cambiato l'alimentatore e riacceso la cornice. Il PC ha verificato un boot ID diverso dalla baseline, `sys.boot_completed=1`, connessione ADB autenticata disponibile, entrambe le proprietà persistenti ancora impostate, porta corrente 5555, chiavi invariate, shell UID 2000 e `su -c id` con UID 0. Nessuno script Termux è stato usato per ripristinare la connessione. L'evidenza tecnica di questo test resta locale in `work/device-diagnostics/native-persistence-after-power-cycle.json`.
 
 Termux era stato installato come possibile terminale locale e resta disponibile, ma non partecipa a questo meccanismo di persistenza. Non sono stati installati Termux:Boot o servizi analoghi.
 
@@ -100,4 +102,4 @@ Se non compare il log, il test non ha dimostrato compatibilità. Non modificare 
 - [Descrizione del percorso SD sul 159K con Frameo 1.30.19](https://github.com/dusty-du/frameo-159k-jailbreak-builder).
 - [Test diagnostico dello stesso meccanismo su un Dromart MI86 con Frameo 80321](https://github.com/wesbos/photo-frame-dashboard/pull/262). Il firmware Android e l'hardware di quel dispositivo sono diversi: il suo enabler ADB non viene utilizzato.
 
-La riuscita su questa unità non garantisce la riuscita su altre cornici. Distinguere il test diagnostico e la connessione ADB riusciti su hardware, le simulazioni sul PC, la persistenza nativa applicata ma ancora in attesa della prova di riavvio, e il debloating non ancora eseguito.
+La riuscita su questa unità non garantisce la riuscita su altre cornici. Test diagnostico, connessione ADB e persistenza nativa dopo uno spegnimento completo sono verificati su questa unità. Le simulazioni sul PC restano distinte dalle prove hardware. Il debloating non è ancora stato eseguito.
