@@ -32,7 +32,11 @@ In caso di errore, tenta di ripristinare chiavi, metadati, porta temporanea e st
 
 L'archivio contiene una nuova struttura di scheda: trasferire i file con il trigger `Frameo_utilities/frameo_utilities.config` per ultimo. Non sovrascrivere pacchetti di manutenzione altrui o baseline di tentativi precedenti. Il trasferimento fatto per questa unità controlla prima gli hash del precedente pacchetto diagnostico e ne conserva una copia locale. Dopo la prova, il PC deve verificare `adb connect` e l'esecuzione di una shell autenticata. Il messaggio dell'utility `APK successfully installed` non costituisce questa verifica.
 
-Il sorgente e il pacchetto sono verificati sul PC. L'esecuzione dell'enabler ADB su hardware resta da verificare.
+Il primo accesso è stato verificato su hardware il 1 novembre 2026: il PC ha ottenuto stato ADB `device`, eseguito una shell con UID 2000 e verificato UID 0 tramite `su -c id`. Il dispositivo ha confermato `ro.adb.secure=1`, `service.adb.tcp.port=5555` e porta persistente ancora vuota. Il log dell'enabler conferma i controlli locali; la baseline completa del setup è conservata soltanto localmente, sotto `work/device-diagnostics/adb-baseline/`.
+
+Termux ufficiale GitHub 0.118.3 è stato installato via ADB dopo verifica SHA256 dell'APK universale, aperto con `com.termux/.app.TermuxActivity` e verificato con bootstrap inizializzato (`files/usr/bin/bash` eseguibile). Frameo e i pacchetti di sistema non sono stati disabilitati o rimossi in questa fase.
+
+La connessione reale e l'accesso root sono quindi verificati. La persistenza al riavvio non è configurata né testata: conservare la baseline prima di ulteriori modifiche e non trattare questo primo accesso come permanente.
 
 ## Verifiche del codice ADB
 
@@ -70,4 +74,4 @@ Se non compare il log, il test non ha dimostrato compatibilità. Non modificare 
 - [Descrizione del percorso SD sul 159K con Frameo 1.30.19](https://github.com/dusty-du/frameo-159k-jailbreak-builder).
 - [Test diagnostico dello stesso meccanismo su un Dromart MI86 con Frameo 80321](https://github.com/wesbos/photo-frame-dashboard/pull/262). Il firmware Android e l'hardware di quel dispositivo sono diversi: il suo enabler ADB non viene utilizzato.
 
-La riuscita su altre unità non garantisce la riuscita su questa cornice. Distinguere il test diagnostico già riuscito sulla cornice, le simulazioni sul PC e la verifica ADB reale ancora necessaria.
+La riuscita su questa unità non garantisce la riuscita su altre cornici. Distinguere il test diagnostico e la connessione ADB riusciti su hardware, le simulazioni sul PC e le modifiche di persistenza o debloating ancora da affrontare.
