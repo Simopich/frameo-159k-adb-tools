@@ -3,6 +3,8 @@ param(
     [string] $BuildTools = './work/android-tools/build-tools_r36_windows/android-16',
     [string] $AndroidJar = './work/android-tools/platform-27_r03/android-8.1.0/android.jar',
     [string] $Java = 'java.exe',
+    [ValidateSet('Probe', 'Adb')] [string] $Mode = 'Probe',
+    [string] $AdbPublicKey,
     [ValidateRange(80322, 2100000000)] [int] $VersionCode = 80322,
     [string] $Output = './outputs/frameo-159k-sd-probe'
 )
@@ -11,6 +13,21 @@ $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $repo
 $utf8 = [System.Text.UTF8Encoding]::new($false)
+$normalizedPublicKey = $null
+if ($Mode -eq 'Adb') {
+    if (-not $AdbPublicKey) { throw 'Adb mode requires -AdbPublicKey pointing to adbkey.pub.' }
+    $keyPath = (Resolve-Path -LiteralPath $AdbPublicKey).Path
+    if ([System.IO.Path]::GetFileName($keyPath) -eq 'adbkey') { throw 'Pass the public .pub key, never the private adbkey.' }
+    $keyText = [System.IO.File]::ReadAllText($keyPath)
+    $keyLines = @($keyText -split '\r?\n' | Where-Object { $_.Trim() })
+    if ($keyLines.Count -ne 1 -or $keyText.Contains('PRIVATE')) { throw 'Invalid public key file.' }
+    $blob = ($keyLines[0].Trim() -split '\s+')[0]
+    $bytes = [Convert]::FromBase64String($blob)
+    if ($bytes.Length -ne 524 -or [BitConverter]::ToUInt32($bytes, 0) -ne 64 -or $blob.Length -ne 700) {
+        throw 'Expected an Android ADB RSA2048 public key.'
+    }
+    $normalizedPublicKey = "$blob frameo-local-pc`n"
+}
 
 function Write-Utf8Lf([string] $Path, [string] $Text) {
     [System.IO.File]::WriteAllText($Path, $Text.Replace("`r`n", "`n"), $utf8)
@@ -90,8 +107,14 @@ New-Item -ItemType Directory -Path $utilities -Force | Out-Null
 $payloadName = 'x'';sh${IFS}$(find${IFS}${ANDROID_DATA%data}storage${IFS}-maxdepth${IFS}2${IFS}-name${IFS}p_frameo_jb);#.apk'
 Copy-Item -LiteralPath $signed -Destination (Join-Path $utilities $payloadName)
 Write-Utf8Lf (Join-Path $utilities 'frameo_utilities.config') "auto_run=action_update_version`n"
-$probe = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'sd-probe.sh'))
+$deviceScript = if ($Mode -eq 'Adb') { 'sd-enable-adb.sh' } else { 'sd-probe.sh' }
+$probe = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot $deviceScript))
 Write-Utf8Lf (Join-Path $card 'p_frameo_jb') $probe
+if ($Mode -eq 'Adb') {
+    $adbState = Join-Path $card 'frameo-159k-adb'
+    New-Item -ItemType Directory -Path $adbState | Out-Null
+    Write-Utf8Lf (Join-Path $adbState 'adbkey.pub') $normalizedPublicKey
+}
 $instructions = @'
 TEST DIAGNOSTICO FRAMEO 159K - compatibilita non ancora verificata
 
@@ -105,6 +128,26 @@ Non esegue su, non abilita ADB, non modifica impostazioni e non scrive firmware.
 Rimuovi i file del pacchetto dalla scheda dopo il test.
 '@
 Write-Utf8Lf (Join-Path $card 'LEGGIMI.txt') ($instructions + "`n")
+if ($Mode -eq 'Adb') {
+    $adbInstructions = @'
+ACCESSO ADB WI-FI AUTENTICATO, PRIMA CONNESSIONE TEMPORANEA
+
+Solo per la precisa unita 159K verificata dal log diagnostico.
+Il codice controlla modello, piattaforma, API, build e fingerprint prima delle modifiche.
+Aggiunge la sola chiave pubblica del PC, preserva le chiavi precedenti e abilita TCP 5555.
+Mantiene ro.adb.secure=1; non configura la porta persistente al riavvio.
+Salva baseline e risultato nella cartella frameo-159k-adb sulla scheda.
+In caso di errore tenta il ripristino e ne registra l'esito.
+
+Apri Impostazioni sulla cornice, inserisci scheda, attendi 30 secondi.
+Chiudi il task con Complete task. Lascia la cornice accesa sulla stessa rete.
+Il PC deve ancora verificare adb connect e una shell autenticata.
+Un messaggio APK successfully installed da solo non prova che ADB funzioni.
+Il nome insolito dell'APK contiene sintassi shell: non incollarlo in un terminale.
+I file di chiave privata non sono inclusi nel pacchetto.
+'@
+    Write-Utf8Lf (Join-Path $card 'LEGGIMI.txt') ($adbInstructions + "`n")
+}
 
 $inventory = @()
 $zip = [System.IO.Compression.ZipFile]::Open($archivePath, [System.IO.Compression.ZipArchiveMode]::Create)
@@ -125,7 +168,8 @@ foreach ($entry in $inventory) {
     }
 }
 $metadata = [ordered]@{
-    schema = 'frameo-sd-diagnostic/v1'
+    schema = 'frameo-sd-package/v1'
+    mode = $Mode
     tested_on_device = $false
     intended_frameo_version_code = 80321
     apk_version_code = $VersionCode
