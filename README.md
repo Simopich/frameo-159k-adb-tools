@@ -36,7 +36,33 @@ Il primo accesso è stato verificato su hardware il 1 novembre 2026: il PC ha ot
 
 Termux ufficiale GitHub 0.118.3 è stato installato via ADB dopo verifica SHA256 dell'APK universale, aperto con `com.termux/.app.TermuxActivity` e verificato con bootstrap inizializzato (`files/usr/bin/bash` eseguibile). Frameo e i pacchetti di sistema non sono stati disabilitati o rimossi in questa fase.
 
-La connessione reale e l'accesso root sono quindi verificati. La persistenza al riavvio non è configurata né testata: conservare la baseline prima di ulteriori modifiche e non trattare questo primo accesso come permanente.
+La connessione reale e l'accesso root sono quindi verificati. La prima fase era temporanea; il successivo passaggio di persistenza nativa è descritto sotto.
+
+## Persistenza nativa, senza dipendenza da Termux
+
+Sulla precisa unità esaminata, `/init.rk30board.rc` contiene già questo trigger del produttore:
+
+```text
+on property:persist.internet.adb.enable=1
+    setprop service.adb.tcp.port 5555
+    restart adbd
+```
+
+È stato eseguito come root `scripts/enable-native-adb-persistence.sh`, dopo aver salvato la baseline originale in `work/device-diagnostics/native-persistence-before.json`. Lo script verifica identità del firmware, UID 0, autenticazione e presenza del trigger; imposta `persist.adb.tcp.port=5555` e `persist.internet.adb.enable=1`. Non modifica i file init o le immagini firmware, non aggiunge script di avvio e non invia comandi di reboot.
+
+Readback e riconnessione hanno confermato entrambe le proprietà persistenti, porta corrente 5555, `ro.adb.secure=1`, chiavi autorizzate invariate e accesso root. Il boot ID è ancora quello precedente all'intervento. **La prova dopo un riavvio o spegnimento completo è pendente:** sarà eseguita dopo che il proprietario avrà cambiato l'alimentatore. La configurazione non viene dichiarata verificata attraverso i riavvii prima di quella prova.
+
+Termux era stato installato come possibile terminale locale e resta disponibile, ma non partecipa a questo meccanismo di persistenza. Non sono stati installati Termux:Boot o servizi analoghi.
+
+Per annullare soltanto questo passaggio sulla stessa unità, la baseline originale rilevava entrambe le proprietà persistenti vuote e la porta temporanea già a 5555. Con accesso root ancora disponibile, il ripristino di tali valori può essere effettuato con:
+
+```powershell
+# $adb indica adb.exe; $target indica indirizzo e porta della cornice.
+$restore = 'setprop persist.internet.adb.enable ""; setprop persist.adb.tcp.port ""; setprop service.adb.tcp.port 5555; stop adbd; start adbd'
+& $adb -s $target shell "su -c '$restore'"
+```
+
+Usare i valori della baseline del proprio dispositivo; questi comandi descrivono solo quella registrata su questa unità. Il ripristino delle proprietà non modifica le chiavi autorizzate. Verificare sempre riconnessione e readback dopo qualsiasi intervento.
 
 ## Verifiche del codice ADB
 
@@ -74,4 +100,4 @@ Se non compare il log, il test non ha dimostrato compatibilità. Non modificare 
 - [Descrizione del percorso SD sul 159K con Frameo 1.30.19](https://github.com/dusty-du/frameo-159k-jailbreak-builder).
 - [Test diagnostico dello stesso meccanismo su un Dromart MI86 con Frameo 80321](https://github.com/wesbos/photo-frame-dashboard/pull/262). Il firmware Android e l'hardware di quel dispositivo sono diversi: il suo enabler ADB non viene utilizzato.
 
-La riuscita su questa unità non garantisce la riuscita su altre cornici. Distinguere il test diagnostico e la connessione ADB riusciti su hardware, le simulazioni sul PC e le modifiche di persistenza o debloating ancora da affrontare.
+La riuscita su questa unità non garantisce la riuscita su altre cornici. Distinguere il test diagnostico e la connessione ADB riusciti su hardware, le simulazioni sul PC, la persistenza nativa applicata ma ancora in attesa della prova di riavvio, e il debloating non ancora eseguito.
