@@ -54,7 +54,7 @@ Readback e riconnessione iniziali hanno confermato entrambe le proprietà persis
 
 **Persistenza verificata dopo uno spegnimento completo il 1 novembre 2026.** Il proprietario ha cambiato l'alimentatore e riacceso la cornice. Il PC ha verificato un boot ID diverso dalla baseline, `sys.boot_completed=1`, connessione ADB autenticata disponibile, entrambe le proprietà persistenti ancora impostate, porta corrente 5555, chiavi invariate, shell UID 2000 e `su -c id` con UID 0. Nessuno script Termux è stato usato per ripristinare la connessione. L'evidenza tecnica di questo test resta locale in `work/device-diagnostics/native-persistence-after-power-cycle.json`.
 
-Termux era stato installato come possibile terminale locale e resta disponibile, ma non partecipa a questo meccanismo di persistenza. Non sono stati installati Termux:Boot o servizi analoghi.
+Termux era stato installato come possibile terminale locale, ma non partecipa a questo meccanismo di persistenza. È stato successivamente disinstallato su richiesta del proprietario: il package `com.termux` risulta assente e ADB autenticato, proprietà persistenti e accesso root restano verificati. Non sono stati installati Termux:Boot o servizi analoghi.
 
 Per annullare soltanto questo passaggio sulla stessa unità, la baseline originale rilevava entrambe le proprietà persistenti vuote e la porta temporanea già a 5555. Con accesso root ancora disponibile, il ripristino di tali valori può essere effettuato con:
 
