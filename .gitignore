@@ -1,0 +1,12 @@
+/work/
+/outputs/
+/.idea/
+.env
+.env.*
+*.keystore
+*.jks
+*.p12
+adbkey
+adbkey.pub
+*-probe.txt
+*-probe.done
