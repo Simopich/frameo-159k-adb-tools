@@ -10,3 +10,5 @@ adbkey
 adbkey.pub
 *-probe.txt
 *-probe.done
+__pycache__/
+*.py[cod]

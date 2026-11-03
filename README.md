@@ -26,6 +26,7 @@ The implementation here was prepared with Codex assistance. Device properties, r
 | Android | `8.1.0`, API `27` |
 | Reported security patch | `2020-11-05` |
 | Frameo application | `v1.32.16_-_OTA_test`, versionCode `80321` |
+| Factory Frameo APK | `v1.28.14`, versionCode `58400`, `/system/priv-app/newFrameo/newFrameo.apk` |
 | Android firmware build | `RK3326_8.1_AY_FRAMEO_202511241509` |
 | Build fingerprint | `rockchip/rk3326_evb/rk3326_evb:8.1.0/OC/150829:user/release-keys` |
 | Kernel | `4.4.138` |
@@ -193,3 +194,30 @@ Ten host scenarios passed: preserving keys, one-shot success, empty keys, absent
 Package builds check APK identity, API level, v1 signature, absence of DEX and ZIP extraction hashes. These checks are distinct from the hardware probe, authenticated connection, cold-boot test and post-Termux-removal checks that succeeded on the actual frame.
 
 `work/`, `outputs/`, downloaded SDKs, generated packages, signing keys, real ADB keys and device logs are ignored by Git. The repository contains source and documentation, not a binary pre-authorized for someone else's device. No debloating has been performed as part of this report.
+## Private pre-flash backups
+
+`backup_frameo.py` and its companion `backup-device.sh` preserve application and OEM state from this exact firmware. They require an existing authenticated, root-capable ADB connection, Python 3.9 or newer, and at least 12 GiB of free local space. Use a new private output directory outside this public checkout:
+
+```powershell
+python ./scripts/backup_frameo.py `
+  --adb "C:/path/to/platform-tools/adb.exe" `
+  --target FRAME_IP:5555 `
+  --exclude-photos `
+  --output "C:/private-backups/frameo-159k-backup"
+```
+
+The collector reads every APK under system, vendor, OEM and installed-app paths, including the updated and factory Frameo copies. It saves package/UID/permission inventories, settings exports, init/fstab files, OEM configuration and Frameo vendor licensing files where present. A data-root archive preserves application data and configuration while excluding rebuildable caches, volatile logs, sockets/FIFOs and the temporary collection directory. Frameo is briefly force-stopped for that archive and its previous activity is reopened afterward.
+
+`--exclude-photos` additionally excludes known personal photo/video, thumbnail and Frameo image-cache paths. Exact exclusions are recorded in the backup. App databases and preferences are retained and can still contain references to omitted media. Other data remains private even when photos are excluded.
+
+The tool also reads compressed images of named recovery/firmware partitions. It does not image the large userdata or cache partitions and does not issue flash writes, reboot the frame, disable apps or change persistent ADB settings. APKs, metadata, compressed images and archives are staged in a new private root-owned directory under `/data/local/tmp`, granted read-only access for the authenticated ADB shell group, copied to the PC and compared against device-side SHA256 hashes. Verification checks APK ZIP CRCs, gzip integrity, tar listings, decompressed partition sizes/hashes, the presence of Frameo data, and media-path exclusions. Only after successful verification is the tool's own device staging removed. Failed attempts retain their staging for inspection.
+
+**Backup output is private, local and unencrypted.** It can contain Wi-Fi credentials, application tokens, vendor licenses, account/device identities and other personal information. Never upload these files or vendor firmware to this public repository. The output directory includes an ignore-all `.gitignore`, but that is not a substitute for keeping it outside a public checkout.
+
+This is a preservation backup, not an atomic live-system snapshot or a universally flashable image. A new OS can assign different app UIDs, require different SELinux labels, lack OEM libraries or privileged permissions, and reject hardware-bound credentials or licenses. Install compatible APKs first and restore app data selectively. Do not blindly extract all of `/data` or flash these unit-specific partition images onto another frame. A full restoration has not been tested.
+
+If collection completed but transfer failed, use the same arguments and output directory with `--resume`. This checks the original ownership/completion markers and resumes transfer without stopping Frameo or recollecting its data. An incomplete device collection cannot be resumed this way.
+
+An optional offline check uses `scripts/verify_private_backup.py` with `--backup`, `--aapt2` and a private `--scratch` directory. It writes an APK version/hash index, parses Frameo preference XML, and runs SQLite quick checks on isolated copies of its SQLite files. Realm data is preserved as bytes but not semantically validated with a Realm engine.
+
+The documented frame yielded 56 APKs, including the current and factory Frameo versions, 14 named recovery/firmware images, and private application/OEM state. Device/PC hashes, APK ZIP checks, compressed-image hashes/lengths and tar listings passed. The photo-excluded archive contained no files in the documented personal-media paths. Additional offline checks parsed nine Frameo preference XML files and returned successful SQLite checks for three databases; two Realm files were retained without engine-level validation. No hardware restoration has been attempted.
