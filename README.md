@@ -11,7 +11,7 @@ Separate November 14, 2026 follow-up work uses the existing authenticated ADB co
 - [Custom dashboard HOME, Nova fallback, stock startup suppression, and recovery](safe-boot.md).
 - [Lightweight Fulguris browser installation and HTTPS verification](browser.md).
 - [Lightweight LibreTube YouTube client and physical-device playback verification](youtube.md).
-- [Open-source PC display mirroring with AVNC and TightVNC](wireless-display.md).
+- [Independent extended PC display using AVNC, TightVNC and the existing SudoVDA driver](wireless-display.md).
 
 The historical ADB and backup results below retain the original test versions and scope. Later application updates and launcher configuration do not establish a new firmware or cold-boot result unless explicitly recorded in the follow-up report.
 

@@ -21,15 +21,31 @@ if ($Port -lt 1024 -or $Port -gt 65535) { throw 'Port must be between 1024 and 6
 if ($Target -notmatch '^\d{1,3}(\.\d{1,3}){3}:\d+$') { throw 'Target must be an IPv4 ADB endpoint.' }
 if (-not $Stop -and $HostAddress -notmatch '^\d{1,3}(\.\d{1,3}){3}$') { throw 'HostAddress must be an IPv4 address.' }
 $server = Join-Path $state 'tightvnc-portable/PFiles/TightVNC/tvnserver.exe'
+$virtual = Join-Path $state 'virtual-display'
+$stopFile = Join-Path $virtual 'lifecycle-stop'
+$readyFile = Join-Path $virtual 'lifecycle-ready'
+$pidFile = Join-Path $virtual 'lifecycle.pid'
 $key = 'HKCU:\Software\TightVNC\Server'
 if (-not (Test-Path -LiteralPath $server)) { throw 'Extract the official TightVNC 2.8.90 GPL MSI as documented in wireless-display.md.' }
 $existing = if (Test-Path $key) { Get-ItemProperty $key } else { $null }
 if ($existing -and $existing.FrameoManaged -ne 1) { throw 'Existing TightVNC user configuration detected. Preserve it and configure a separate companion manually.' }
 if (@(Get-Process tvnserver -ErrorAction SilentlyContinue | Where-Object { $_.Path -ne $server }).Count) { throw 'Another TightVNC server is running. Stop it or configure this companion separately.' }
+# Stop only this launcher's earlier supervisor before changing its server.
+if (Test-Path -LiteralPath $pidFile) {
+    $oldPid=[int](Get-Content -LiteralPath $pidFile)
+    $old=Get-CimInstance Win32_Process -Filter ('ProcessId='+$oldPid) -ErrorAction SilentlyContinue
+    if ($old -and $old.CommandLine -like '*Run-WirelessDisplay.ps1*') {
+        New-Item -ItemType File -Path $stopFile -Force | Out-Null
+        $process=Get-Process -Id $oldPid -ErrorAction SilentlyContinue
+        if ($process -and -not $process.WaitForExit(10000)) { $process | Stop-Process }
+    }
+}
+foreach ($path in @($stopFile,$readyFile,(Join-Path $virtual 'capture-watch.pid'))) { if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path } }
 if ($Stop) {
     $processes = Get-Process tvnserver -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $server }
     $processes | Stop-Process
-    Write-Output 'Wireless display stopped. AVNC and the local companion remain installed.'
+    & (Join-Path $PSScriptRoot 'Manage-FrameDisplay.ps1') -Action Stop
+    Write-Output 'Wireless display stopped. AVNC and the existing Apollo driver remain installed.'
     return
 }
 & $Adb connect $Target | Out-Null
@@ -54,24 +70,30 @@ $des.Key = [byte[]](232,74,214,96,196,114,26,224)
 $encrypted = $des.CreateEncryptor().TransformFinalBlock([Text.Encoding]::ASCII.GetBytes($password), 0, 8)
 $des.Dispose()
 New-Item -Path $key -Force | Out-Null
-$settings = @{FrameoManaged=1; RfbPort=$Port; AcceptRfbConnections=1; UseVncAuthentication=1; LoopbackOnly=0; AllowLoopback=1; AcceptHttpConnections=0; EnableFileTransfers=0; BlockRemoteInput=1; RemoveWallpaper=0; RunControlInterface=1}
+$settings = @{FrameoManaged=1; RfbPort=$Port; AcceptRfbConnections=0; UseVncAuthentication=1; LoopbackOnly=0; AllowLoopback=0; AcceptHttpConnections=0; EnableFileTransfers=0; BlockRemoteInput=1; RemoveWallpaper=0; RunControlInterface=1; LogLevel=4; SaveLogToAllUsersPath=0}
 foreach ($name in $settings.Keys) { New-ItemProperty -Path $key -Name $name -Value $settings[$name] -PropertyType DWord -Force | Out-Null }
-New-ItemProperty -Path $key -Name IpAccessControl -Value (($Target.Split(':')[0])+':0,127.0.0.1:0,0.0.0.0-255.255.255.255:1') -PropertyType String -Force | Out-Null
+New-ItemProperty -Path $key -Name IpAccessControl -Value (($Target.Split(':')[0])+':0,0.0.0.0-255.255.255.255:1') -PropertyType String -Force | Out-Null
 New-ItemProperty -Path $key -Name Password -Value $encrypted -PropertyType Binary -Force | Out-Null
 $process = Get-Process tvnserver -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $server }
-if (-not $process) { Start-Process -FilePath $server -ArgumentList '-run' -WindowStyle Hidden | Out-Null }
-else { & $server -controlapp -reload | Out-Null }
+if ($process) { $process | Stop-Process; Start-Sleep -Milliseconds 500 }
+Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'pwsh.exe' -and $_.CommandLine -like '*Manage-FrameDisplay.ps1*Watch*' -and $_.ProcessId -ne $PID } | ForEach-Object { Stop-Process -Id $_.ProcessId }
+$serverProcess=Start-Process -FilePath $server -ArgumentList '-run' -WindowStyle Hidden -PassThru
 Start-Sleep -Seconds 2
+$pwsh=(Get-Process -Id $PID).Path
+Start-Process -FilePath $pwsh -WindowStyle Hidden -ArgumentList '-NoProfile','-File',('"'+(Join-Path $PSScriptRoot 'Run-WirelessDisplay.ps1')+'"'),'-FrameAddress',($Target.Split(':')[0]),'-ServerProcessId',$serverProcess.Id,'-Port',$Port | Out-Null
+$deadline=[DateTime]::UtcNow.AddSeconds(15)
+while (-not (Test-Path -LiteralPath $readyFile) -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 200 }
+if (-not (Test-Path -LiteralPath $readyFile)) { throw 'The session supervisor did not become ready. See work/wireless-display/virtual-display/lifecycle-error.txt.' }
 $listeners = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
 $serverPids = @(Get-Process tvnserver -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $server } | Select-Object -ExpandProperty Id)
 if (-not $listeners -or @($listeners | Where-Object { $_.OwningProcess -notin $serverPids }).Count) {
     Get-Process tvnserver -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $server } | Stop-Process
     throw 'VNC listener was not verified; companion stopped.'
 }
-& $server -controlapp -shareprimary | Out-Null
 $uri = 'vnc://' + $HostAddress + ':' + $Port + '?VncPassword=' + [Uri]::EscapeDataString($password) + '&ConnectionName=PC%20Wireless%20Display&ViewOnly=true&SaveConnection=true'
 # Suppress ActivityManager output because it echoes the credential-bearing URI.
+& $Adb -s $Target shell am force-stop com.gaurav.avnc *> $null
 & $Adb -s $Target shell am start -a android.intent.action.VIEW -p com.gaurav.avnc -d ('"' + $uri + '"') *> $null
 if ($LASTEXITCODE -ne 0) { throw 'Could not open AVNC.' }
 Remove-Variable password,uri,encrypted
-Write-Output 'Wireless display started: primary PC monitor, view-only VNC, restricted to the frame IP. No service or firewall rule installed.'
+Write-Output 'Session-bound wireless display ready. The dedicated 1920x1080 monitor appears after VNC authentication and disappears 3 seconds after disconnect.'
