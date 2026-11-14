@@ -70,10 +70,13 @@ public static class FrameDisplayNative
         var physical=List().Where(d=>d.Active && d.Name!=target.Name).ToArray();
         if(physical.Length==0) throw new InvalidOperationException("No existing desktop display to preserve.");
         if(target.Primary) throw new InvalidOperationException("Virtual display is primary; restore the physical primary display first.");
+        // Put the frame left of existing displays without moving their desktop coordinates.
+        int left=physical.Min(d=>d.X)-width;
+        int top=physical.Single(d=>d.Primary).Y;
         if(target.Active && target.Width==width && target.Height==height && target.Orientation==0 && target.RefreshRate==refreshRate
-            && physical.All(d=>!Overlaps(target, d))) return target;
+            && target.X==left && target.Y==top && physical.All(d=>!Overlaps(target, d))) return target;
         var mode=Mode(target.Name);
-        mode.dmPositionX=physical.Max(d=>d.X+d.Width); mode.dmPositionY=physical.Min(d=>d.Y);
+        mode.dmPositionX=left; mode.dmPositionY=top;
         mode.dmPelsWidth=width; mode.dmPelsHeight=height; mode.dmDisplayFrequency=refreshRate; mode.dmBitsPerPel=32; mode.dmDisplayOrientation=0;
         mode.dmFields=0x20|0x80|0x40000|0x80000|0x100000|0x400000;
         int status=ChangeDisplaySettingsEx(target.Name, ref mode, IntPtr.Zero, 2, IntPtr.Zero);
@@ -88,7 +91,7 @@ public static class FrameDisplayNative
                 throw new InvalidOperationException("Existing display layout changed unexpectedly: " + old.Name);
         }
         target=Virtual(name);
-        if(!target.Active || target.Width!=width || target.Height!=height || target.Primary || physical.Any(d=>Overlaps(target,d)))
+        if(!target.Active || target.Width!=width || target.Height!=height || target.X!=left || target.Y!=top || target.Primary || physical.Any(d=>Overlaps(target,d)))
             throw new InvalidOperationException("Virtual display is not an independent extended desktop.");
         return target;
     }

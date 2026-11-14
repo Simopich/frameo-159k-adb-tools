@@ -64,6 +64,7 @@ try {
             $overlap=@($displays | Where-Object { $_.Active -and $_.Name -ne $display.Name -and $_.X -lt ($display.X+1920) -and ($_.X+$_.Width) -gt $display.X -and $_.Y -lt ($display.Y+1080) -and ($_.Y+$_.Height) -gt $display.Y }).Count
             if (-not $current -or $overlap -or $current.Primary -or $current.X -ne $display.X -or $current.Y -ne $display.Y -or $current.Width -ne 1920 -or $current.Height -ne 1080) { throw 'Dedicated display geometry changed; restart the launcher.' }
             if (-not $capturing) {
+                # TightVNC requires literal '+' separators, including '+-1920' for a negative X.
                 $rectangle='{0}x{1}+{2}+{3}' -f 1920,1080,$display.X,$display.Y
                 Control @('-sharerect',$rectangle)
                 $capturing=$true

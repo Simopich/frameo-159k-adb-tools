@@ -13,6 +13,7 @@ $form.StartPosition = 'Manual'
 $form.Bounds = [Drawing.Rectangle]::new($display.X,$display.Y,1920,1080)
 $form.BackColor = [Drawing.Color]::FromArgb(12,32,72)
 $form.ShowInTaskbar = $false
+$form.TopMost = $true
 $label = [Windows.Forms.Label]::new()
 $label.Dock = 'Fill'
 $label.TextAlign = 'MiddleCenter'

@@ -1,6 +1,6 @@
 # Independent extended PC display on the Frameo 159K
 
-The frame is a separate Windows desktop display, **1920×1080 at a configured 60 Hz**. AVNC receives only this virtual display through TightVNC. The physical PC monitor remains primary. Move a window beyond the PC monitor's right edge to put it on the frame.
+The frame is a separate Windows desktop display, **1920×1080 at a configured 60 Hz**, placed to the **left** of the existing displays and aligned with the primary display's top edge. AVNC receives only this virtual display through TightVNC. The physical PC monitor remains primary. Move a window beyond the PC monitor's left edge to put it on the frame.
 
 ## Use and rollback
 
@@ -26,11 +26,11 @@ This PC runs Windows 11 Pro build 26200 with an AMD Radeon RX 7700 XT and AMD in
 | Display | Position | Resolution | Refresh rate | Primary |
 | --- | --- | --- | --- | --- |
 | Existing physical monitor | 0, 0 | 3440×1440 | 180 Hz | Yes |
-| Dedicated Frameo desktop | 3440, 0 | 1920×1080 | 60 Hz | No |
+| Dedicated Frameo desktop | -1920, 0 | 1920×1080 | 60 Hz | No |
 
 The disjoint desktop geometry was enumerated through Win32. The physical monitor's position, resolution, orientation, primary status and refresh rate matched the baseline after creation, repeated launcher invocation, removal and recreation of the virtual monitor.
 
-A full-screen test window occupied only `3440,0,1920,1080`, outside the physical monitor. The frame screenshot showed **FRAMEO EXTENDED DISPLAY**, **Independent Windows workspace** and a live clock. TightVNC shared only `1920x1080+3440+0`. The test window was closed after verification. A real AVNC force-stop then removed the virtual monitor while the physical monitor remained unchanged and the VNC listener stayed open. Reopening only the saved AVNC profile recreated the extended monitor through the same running supervisor. Private screenshots and layout snapshots remain under ignored `work/wireless-display/virtual-display/`.
+A full-screen test window occupied only `-1920,0,1920,1080`, outside the physical monitor. The frame screenshot showed **FRAMEO EXTENDED DISPLAY**, **Independent Windows workspace** and a live clock. TightVNC shared only `1920x1080+-1920+0`: this CLI requires literal `+` separators even before negative coordinates. The test window was closed after verification. A real AVNC force-stop then removed the virtual monitor while the physical monitor remained unchanged and the VNC listener stayed open. Reopening only the saved AVNC profile recreated the extended monitor through the same running supervisor. Private screenshots and layout snapshots remain under ignored `work/wireless-display/virtual-display/`.
 
 An optional test window can be opened in another process:
 
