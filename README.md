@@ -4,6 +4,17 @@ Windows PowerShell tools and a report for one owner-controlled Frameo 159K. The 
 
 ADB was already included in the firmware. This project enables access to it. It does not install a replacement daemon or flash a rooted image.
 
+## Later application and launcher setup
+
+Separate November 14, 2026 follow-up work uses the existing authenticated ADB connection:
+
+- [Custom dashboard HOME, Nova fallback, stock startup suppression, and recovery](safe-boot.md).
+- [Lightweight Fulguris browser installation and HTTPS verification](browser.md).
+- [Lightweight LibreTube YouTube client and physical-device playback verification](youtube.md).
+- [Open-source PC display mirroring with AVNC and TightVNC](wireless-display.md).
+
+The historical ADB and backup results below retain the original test versions and scope. Later application updates and launcher configuration do not establish a new firmware or cold-boot result unless explicitly recorded in the follow-up report.
+
 ## Credits and original research
 
 - **[dusty-du/frameo-159k-jailbreak-builder](https://github.com/dusty-du/frameo-159k-jailbreak-builder): the key source for the SD auto-run and APK-filename command-injection mechanism.** Its report covers Frameo 1.30.19 on a 159K. This project adapts the mechanism and checks the unit below; it does not claim discovery of the vulnerability.
