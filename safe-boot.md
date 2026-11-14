@@ -4,6 +4,8 @@
 
 This configuration uses Android's existing default HOME selection on the tested Frameo 159K, Android 8.1/API 27. It does not edit init scripts, firmware, boot partitions, authentication, or persistent ADB settings. Stock Frameo remains installed and enabled, with its existing data.
 
+The later [global return gesture](https://github.com/Simopich/frameo-dashboard/blob/codex/implementation-plan/docs/GLOBAL_RETURN_GESTURE.md) adds an optional, owner-enabled accessibility handle to the configured Dev app. Hold the right-edge handle for 650 ms, drag left 64 dp, and release to invoke the existing default HOME. Its service requests no screen content or accessibility events. A separate controlled reboot verified automatic binding and return from Fulguris afterward; the HOME and stock boot configuration below were unchanged. The dashboard's **... > Global return gesture** page can hide the handle or disable the service completely.
+
 The owner's configured dashboard is **Dev**, package `com.simopich.framedashboard.dev`, activity `com.simopich.framedashboard.MainActivity`. The separately installed Stable variant has a separate data store and demo configuration; it is not this unit's boot target.
 
 The dashboard declares `MAIN`, `LAUNCHER`, `HOME`, and `DEFAULT` on its existing activity and uses `singleTask`. Repeated HOME presses reuse it. Back on the root HOME activity stays on the dashboard; Back during editing retains the existing discard confirmation. No new boot receiver, service, root startup task, or third-party autostart application is required.
